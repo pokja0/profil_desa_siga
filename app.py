@@ -1,7 +1,10 @@
 from shiny import App, Inputs, Outputs, Session, reactive, render, ui
+import shinyswatch
 import polars as pl
 from shinywidgets import output_widget, render_widget  
 import plotly.express as px
+import plotly.io as pio 
+import faicons
 
 import pandas as pd
 from great_tables import GT, exibble, loc, style
@@ -17,9 +20,44 @@ data_poktan = pl.read_csv("data/profil_poktan.csv")
 
 #data_poktan = pl.read_csv("data/profil_poktan.csv")
     
-piggy_bank = ui.HTML(
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" class="bi bi-piggy-bank " style="fill:currentColor;height:100%;" aria-hidden="true" role="img" ><path d="M5 6.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0zm1.138-1.496A6.613 6.613 0 0 1 7.964 4.5c.666 0 1.303.097 1.893.273a.5.5 0 0 0 .286-.958A7.602 7.602 0 0 0 7.964 3.5c-.734 0-1.441.103-2.102.292a.5.5 0 1 0 .276.962z"></path>\n<path fill-rule="evenodd" d="M7.964 1.527c-2.977 0-5.571 1.704-6.32 4.125h-.55A1 1 0 0 0 .11 6.824l.254 1.46a1.5 1.5 0 0 0 1.478 1.243h.263c.3.513.688.978 1.145 1.382l-.729 2.477a.5.5 0 0 0 .48.641h2a.5.5 0 0 0 .471-.332l.482-1.351c.635.173 1.31.267 2.011.267.707 0 1.388-.095 2.028-.272l.543 1.372a.5.5 0 0 0 .465.316h2a.5.5 0 0 0 .478-.645l-.761-2.506C13.81 9.895 14.5 8.559 14.5 7.069c0-.145-.007-.29-.02-.431.261-.11.508-.266.705-.444.315.306.815.306.815-.417 0 .223-.5.223-.461-.026a.95.95 0 0 0 .09-.255.7.7 0 0 0-.202-.645.58.58 0 0 0-.707-.098.735.735 0 0 0-.375.562c-.024.243.082.48.32.654a2.112 2.112 0 0 1-.259.153c-.534-2.664-3.284-4.595-6.442-4.595zM2.516 6.26c.455-2.066 2.667-3.733 5.448-3.733 3.146 0 5.536 2.114 5.536 4.542 0 1.254-.624 2.41-1.67 3.248a.5.5 0 0 0-.165.535l.66 2.175h-.985l-.59-1.487a.5.5 0 0 0-.629-.288c-.661.23-1.39.359-2.157.359a6.558 6.558 0 0 1-2.157-.359.5.5 0 0 0-.635.304l-.525 1.471h-.979l.633-2.15a.5.5 0 0 0-.17-.534 4.649 4.649 0 0 1-1.284-1.541.5.5 0 0 0-.446-.275h-.56a.5.5 0 0 1-.492-.414l-.254-1.46h.933a.5.5 0 0 0 .488-.393zm12.621-.857a.565.565 0 0 1-.098.21.704.704 0 0 1-.044-.025c-.146-.09-.157-.175-.152-.223a.236.236 0 0 1 .117-.173c.049-.027.08-.021.113.012a.202.202 0 0 1 .064.199z"></path></svg>'
-)
+icon_title_tes = "About tooltips"
+icons_fa_tes = ui.HTML(
+     f'<svg aria-hidden="true" role="img" viewBox="0 0 512 512" style="height:1em;width:1em;vertical-align:-0.125em;margin-left:auto;margin-right:auto;font-size:inherit;fill:currentColor;overflow:visible;position:relative;"><title>{icon_title_tes}</title><path d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM216 336h24V272H216c-13.3 0-24-10.7-24-24s10.7-24 24-24h48c13.3 0 24 10.7 24 24v88h8c13.3 0 24 10.7 24 24s-10.7 24-24 24H216c-13.3 0-24-10.7-24-24s10.7-24 24-24zm40-208a32 32 0 1 1 0 64 32 32 0 1 1 0-64z"/></svg>'
+    )
+def fa_info_circle(icon_title: str, icons_fa):
+    # Enhanced from https://rstudio.github.io/fontawesome/ via `fontawesome::fa(&quot;info-circle&quot;, a11y = &quot;sem&quot;, title = icon_title)`
+    return ui.span(icon_title, " ", icons_fa)
+# ui.tooltip(
+#     fa_info_circle(icon_title),
+#     "Text shown in the tooltip."
+# )
+
+piggy_bank = fa_info_circle(icon_title_tes, icons_fa_tes)
+
+def filter_poktan(data, filter_kabupaten, filter_kecamatan, filter_desa, filter_bulan):
+    hasil = data.filter(
+        pl.col("KABUPATEN").is_in(filter_kabupaten),
+        pl.col("KECAMATAN").is_in(filter_kecamatan),
+        pl.col("KELURAHAN").is_in(filter_desa),
+        pl.col("BULAN").is_in(filter_bulan)
+    )
+    hasil = hasil.drop("BATAS")
+
+    return hasil
+
+def nilai_bulan_sebelum(bulan_terpilih):
+    daftar_bulan = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"]
+    index = daftar_bulan.index(bulan_terpilih)
+    if index == 0:
+        return daftar_bulan[0]  # Jika bulan terpilih adalah JANUARI, nilai_bulan_sebelum juga JANUARI
+    else:
+        return daftar_bulan[index - 1]
+
+def bulan_hingga(bulan_terpilih):
+    daftar_bulan = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"]
+    index = daftar_bulan.index(bulan_terpilih)
+    return daftar_bulan[:index + 1]
+
 app_ui = ui.page_navbar(
     ui.nav_panel(
         "Dashboard", 
@@ -28,7 +66,7 @@ app_ui = ui.page_navbar(
             ui.input_selectize("pilih_kec", "Pilih Kecamatan", choices=[], multiple=False),
             ui.input_selectize("pilih_desa", "Pilih Desa/Kelurahan", choices=[], multiple=False),
             ui.input_selectize("pilih_bulan", "BULAN", 
-                                  choices=daftar_bulan[:3])
+                                  choices=daftar_bulan[:6], selected="JUNI")
         ),
         ui.input_action_button(
             "action_button", "Tampilkan Data"
@@ -71,24 +109,15 @@ app_ui = ui.page_navbar(
                 "Keluarga Berencana",
                     ui.layout_column_wrap(
                         ui.output_ui("vb_unmet_need"),
-                        ui.value_box(
-                            "KPI Title",
-                            "$1 Billion Dollars",
-                            "Up 30% VS PREVIOUS 30 DAYS",
-                            showcase=piggy_bank,
-                            theme="text-green",
-                            showcase_layout="top right",
-                            full_screen=True,
-                        ),
-                        ui.value_box(
-                            "KPI Title",
-                            "$1 Billion Dollars",
-                            "Up 30% VS PREVIOUS 30 DAYS",
-                            showcase=piggy_bank,
-                            theme="purple",
-                            showcase_layout="bottom",
-                            full_screen=True,
-                        ),
+                        ui.output_ui("vb_tenakes"),
+                        ui.output_ui("vb_tp_kb"),
+                        ui.output_ui("vb_mkjp")
+                    ),
+                    ui.card(
+                        ui.layout_column_wrap(
+                            output_widget("bar_mix_kontrasepsi"),
+                            output_widget("donut_status_pelatihan")
+                        )
                     )
             ),
             ui.nav_panel(
@@ -100,7 +129,8 @@ app_ui = ui.page_navbar(
     ui.nav_panel(
         "Download Data", "ini"
     ),
-    title="Desa Profil"
+    title="Desa Profil",
+    theme=shinyswatch.theme.cerulean()
 )
 
 
@@ -239,8 +269,9 @@ def server(input, output, session):
         data_poktan = pl.read_csv("data/profil_poktan.csv")
             
         data_poktan = data_poktan.filter(pl.col("KABUPATEN").is_in(filter_kabupaten),
-                                            pl.col("KECAMATAN").is_in(filter_kecamatan),
-                                            pl.col("KELURAHAN").is_in(filter_desa))
+                                         pl.col("KECAMATAN").is_in(filter_kecamatan),
+                                         pl.col("KELURAHAN").is_in(filter_desa)
+                                        )
         return render.DataGrid(data_poktan)  
     
     @render_widget  
@@ -254,26 +285,64 @@ def server(input, output, session):
         filter_kabupaten = val_kab.get()
         filter_kecamatan = val_kec.get()
         filter_desa = val_desa.get()
-        data_poktan = pl.read_csv("data/profil_poktan.csv")
-            
-        data_poktan = data_poktan.filter(pl.col("KABUPATEN").is_in(filter_kabupaten),
-                                            pl.col("KECAMATAN").is_in(filter_kecamatan),
-                                            pl.col("KELURAHAN").is_in(filter_desa))
-        # List kolom yang akan dihitung
-        columns_to_count = ["Kampung KB", "Rumah DataKU", "BKB", "BKR", "BKL", "UPPKA", "PIK-R"]
+        filter_bulan = [input.pilih_bulan()]
 
-        # Menghitung jumlah "Ada" untuk setiap kolom
-        counts = [data_poktan[col].str.count_matches("Ada").sum() for col in columns_to_count]
+        bkb = pl.read_excel("data/data_bkb.xlsx")
+        bkr = pl.read_excel("data/data_bkr.xlsx")
+        bkl = pl.read_excel("data/data_bkl.xlsx")
+        uppka = pl.read_excel("data/data_uppka.xlsx")
+        pikr = pl.read_excel("data/data_pikr.xlsx")
+        kkb = pl.read_excel("data/data_kkb.xlsx")
+        rdk = pl.read_excel("data/data_rdk.xlsx")
+        daftar_desa = pl.read_csv("data/data_daftar_desa.csv")
 
-        # Menghitung jumlah desa unik berdasarkan kombinasi KECAMATAN dan KELURAHAN
-        unique_desa = data_poktan.select(["KECAMATAN", "KELURAHAN"]).unique().shape[0]
-
-        # Membuat DataFrame hasil
-        results = pl.DataFrame({
-            "Kategori": ["Desa/Kelurahan"] + columns_to_count,
-            "Jumlah": [unique_desa] + counts
+        bkb = filter_poktan(bkb, filter_kabupaten, filter_kecamatan, filter_desa, filter_bulan)
+        bkr = filter_poktan(bkr, filter_kabupaten, filter_kecamatan, filter_desa, filter_bulan)
+        bkl = filter_poktan(bkl, filter_kabupaten, filter_kecamatan, filter_desa, filter_bulan)
+        uppka = filter_poktan(uppka, filter_kabupaten, filter_kecamatan, filter_desa, filter_bulan)
+        pikr = filter_poktan(pikr, filter_kabupaten, filter_kecamatan, filter_desa, filter_bulan)
+        kkb = filter_poktan(kkb, filter_kabupaten, filter_kecamatan, filter_desa, filter_bulan)
+        rdk = filter_poktan(rdk, filter_kabupaten, filter_kecamatan, filter_desa, filter_bulan)
+        daftar_desa = daftar_desa.filter(
+                pl.col("KABUPATEN").is_in(filter_kabupaten),
+                pl.col("KECAMATAN").is_in(filter_kecamatan),
+                pl.col("KELURAHAN").is_in(filter_desa)
+            )
+        
+        data_poktan = pl.DataFrame({
+            "Desa/Kel": daftar_desa.height,
+            "Kampung KB": kkb["JUMLAH_KKB"].sum(),
+            "Rumah DataKu": rdk["JUMLAH_RDK"].sum(),
+            "BKB": bkr["JUMLAH_BKR"].sum(),
+            "BKR": bkr["JUMLAH_BKR"].sum(),
+            "BKL": bkl["JUMLAH_BKL"].sum(),
+            "UPPKA": uppka["JUMLAH_UPPKA"].sum(),
+            "PIK-R": pikr["JUMLAH_PIKR"].sum()
         })
-        return GT(results)
+
+        data_poktan = data_poktan.unpivot(["Desa/Kel", "Kampung KB", "Rumah DataKu",
+                            "BKB", "BKR", "BKL", "UPPKA", "PIK-R"], 
+                            variable_name="Variable", value_name="Value")
+        # data_poktan = pl.read_csv("data/profil_poktan.csv")
+            
+        # data_poktan = data_poktan.filter(pl.col("KABUPATEN").is_in(filter_kabupaten),
+        #                                     pl.col("KECAMATAN").is_in(filter_kecamatan),
+        #                                     pl.col("KELURAHAN").is_in(filter_desa))
+        # # List kolom yang akan dihitung
+        # columns_to_count = ["Kampung KB", "Rumah DataKU", "BKB", "BKR", "BKL", "UPPKA", "PIK-R"]
+
+        # # Menghitung jumlah "Ada" untuk setiap kolom
+        # counts = [data_poktan[col].str.count_matches("Ada").sum() for col in columns_to_count]
+
+        # # Menghitung jumlah desa unik berdasarkan kombinasi KECAMATAN dan KELURAHAN
+        # unique_desa = data_poktan.select(["KECAMATAN", "KELURAHAN"]).unique().shape[0]
+
+        # # Membuat DataFrame hasil
+        # results = pl.DataFrame({
+        #     "Kategori": ["Desa/Kelurahan"] + columns_to_count,
+        #     "Jumlah": [unique_desa] + counts
+        # })
+        return GT(data_poktan)
     
     @render.ui
     @reactive.event(input.action_button)
@@ -524,18 +593,440 @@ def server(input, output, session):
 
     ### awal KB
 
+        filter_kabupaten = val_kab.get()
+        filter_kecamatan = val_kec.get()
+        filter_desa = val_desa.get()
+        filter_bulan = input.pilih_bulan()
+        data_pus_unmet_need = pl.read_excel("data/data_pus.xlsx")
+
+        def bulan_hingga(bulan_terpilih):
+            daftar_bulan = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"]
+            index = daftar_bulan.index(bulan_terpilih)
+            return daftar_bulan[:index + 1]
+
+        hingga_bulan = bulan_hingga(filter_bulan)
+
+        data_pus_unmet_need = data_pus_unmet_need.filter(
+            pl.col("Kabupaten").is_in(filter_kabupaten),
+            pl.col("Kecamatan").is_in(filter_kecamatan),
+            pl.col("Kelurahan_Desa").is_in(filter_desa),
+            pl.col("Bulan").is_in(hingga_bulan)
+        )
+        data_pus_unmet_need = data_pus_unmet_need.group_by("Bulan").agg(
+            [
+                pl.sum("PUS").alias("PUS"),
+                pl.sum("Unmet Need").alias("Unmet Need")
+            ]
+        )
+
+        # Buat kolom baru yang merupakan hasil pembagian 'total_nilai1' dengan 'total_nilai2'
+        data_pus_unmet_need = data_pus_unmet_need.with_columns(
+            (pl.col("Unmet Need") / pl.col("PUS") *100 ).alias("Unmet Need(%)")
+        )
+
+        data_pus_unmet_need = data_pus_unmet_need.with_columns(
+            pl.col("Unmet Need(%)").round(2)
+        )
+
+        #data_pus_unmet_need
+        df_pandas = data_pus_unmet_need.to_pandas()
+
+        # Peta urutan bulan
+        bulan_urut = {
+            "JANUARI": 1,
+            "FEBRUARI": 2,
+            "MARET": 3,
+            "APRIL": 4,
+            "MEI": 5,
+            "JUNI": 6,
+            "JULI": 7,
+            "AGUSTUS": 8,
+            "SEPTEMBER": 9,
+            "OKTOBER": 10,
+            "NOVEMBER": 11,
+            "DESEMBER": 12
+        }
+
+        # Tambahkan kolom urutan bulan di pandas DataFrame
+        df_pandas['Bulan_urut'] = df_pandas['Bulan'].map(bulan_urut)
+
+        # Urutkan DataFrame berdasarkan urutan bulan
+        df_pandas = df_pandas.sort_values(by='Bulan_urut')
+
+        # Buang kolom urutan bulan setelah pengurutan
+        df_pandas = df_pandas.drop(columns=['Bulan_urut'])
+
+
+        # Buat line chart menggunakan Plotly
+        fig = px.line(df_pandas, x="Bulan", y="Unmet Need(%)", markers=True)
+
+        # Atur judul dan label sumbu
+        fig.update_layout(
+            title="Line Chart of PUS, Unmet Need, and Unmet Need(%)",
+            xaxis_title="Bulan",
+            yaxis_title="Values",
+            legend_title="Metrics"
+        )
+        fig.update_traces(showlegend=False)
+
+        fig.update_traces(
+            line_color="#406EF1",
+            line_width=1,
+            fill="tozeroy",
+            fillcolor="rgba(64,110,241,0.2)",
+            hoverinfo="y",
+        )
+
+        fig.update_xaxes(visible=False, showgrid=False)
+        fig.update_yaxes(visible=False, showgrid=False)
+        fig.update_layout(
+            height=100,
+            hovermode="x",
+            margin=dict(t=0, r=0, l=0, b=0),
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+        )
+        return fig
+
     @render.ui
     #@reactive.event(input.action_button)
     def vb_unmet_need():
-        vb = ui.value_box(
-            "KPI Title",
-            "$1 Billion Dollars",
-            "Up 30% VS PREVIOUS 30 DAYS",
-            showcase=piggy_bank,
-            theme="bg-gradient-orange-red",
+        filter_kabupaten = val_kab.get()
+        filter_kecamatan = val_kec.get()
+        filter_desa = val_desa.get()
+        filter_bulan = input.pilih_bulan()
+        data_pus = pl.read_excel("data/data_pus.xlsx")
+
+        data_pus = data_pus.filter(
+            pl.col("Kabupaten").is_in(filter_kabupaten),
+            pl.col("Kecamatan").is_in(filter_kecamatan),
+            pl.col("Kelurahan_Desa").is_in(filter_desa),
+            pl.col("Bulan").is_in([filter_bulan])
+        )
+        unmet_need_bulan_ini = round(data_pus["Unmet Need"].sum() / data_pus["PUS"].sum() *100, 2)
+        #unmet_need_bulan_ini
+
+        data_pus_bulan_lalu = pl.read_excel("data/data_pus.xlsx")
+
+        data_pus_bulan_lalu = data_pus_bulan_lalu.filter(
+            pl.col("Kabupaten").is_in(filter_kabupaten),
+            pl.col("Kecamatan").is_in(filter_kecamatan),
+            pl.col("Kelurahan_Desa").is_in(filter_desa),
+            pl.col("Bulan").is_in([nilai_bulan_sebelum(filter_bulan)])
+        )
+        unmet_need_bulan_lalu = round(data_pus_bulan_lalu["Unmet Need"].sum() / data_pus_bulan_lalu["PUS"].sum() *100, 2)
+        #unmet_need_bulan_lalu
+
+
+        if unmet_need_bulan_ini > unmet_need_bulan_lalu:
+            icon_title = "Unmet Need"
+            icons_fa = ui.HTML(
+                f'<svg aria-hidden="true" role="img" viewBox="0 0 384 512" style="height:1em;width:0.75em;vertical-align:-0.125em;margin-left:auto;margin-right:auto;font-size:inherit;fill:currentColor;overflow:visible;position:relative;"><path d="M214.6 41.4c-12.5-12.5-32.8-12.5-45.3 0l-160 160c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L160 141.2V448c0 17.7 14.3 32 32 32s32-14.3 32-32V141.2L329.4 246.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3l-160-160z"/></svg>'
+                )
+            kondisi = "Naik"
+        elif unmet_need_bulan_ini < unmet_need_bulan_lalu:
+            icon_title = "Unmet Need"
+            icons_fa = ui.HTML(
+                f'<svg aria-hidden="true" role="img" viewBox="0 0 384 512" style="height:1em;width:0.75em;vertical-align:-0.125em;margin-left:auto;margin-right:auto;font-size:inherit;fill:currentColor;overflow:visible;position:relative;"><path d="M169.4 470.6c12.5 12.5 32.8 12.5 45.3 0l160-160c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L224 370.8 224 64c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 306.7L54.6 265.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l160 160z"/></svg>'
+                )
+            kondisi = "Turun"
+        else:
+            icon_title = "Unmet Need"
+            icons_fa = ui.HTML(
+                f'<svg aria-hidden="true" role="img" viewBox="0 0 512 512" style="height:1em;width:1em;vertical-align:-0.125em;margin-left:auto;margin-right:auto;font-size:inherit;fill:currentColor;overflow:visible;position:relative;"><path d="M105.1 202.6c7.7-21.8 20.2-42.3 37.8-59.8c62.5-62.5 163.8-62.5 226.3 0L386.3 160H336c-17.7 0-32 14.3-32 32s14.3 32 32 32H463.5c0 0 0 0 0 0h.4c17.7 0 32-14.3 32-32V64c0-17.7-14.3-32-32-32s-32 14.3-32 32v51.2L414.4 97.6c-87.5-87.5-229.3-87.5-316.8 0C73.2 122 55.6 150.7 44.8 181.4c-5.9 16.7 2.9 34.9 19.5 40.8s34.9-2.9 40.8-19.5zM39 289.3c-5 1.5-9.8 4.2-13.7 8.2c-4 4-6.7 8.8-8.1 14c-.3 1.2-.6 2.5-.8 3.8c-.3 1.7-.4 3.4-.4 5.1V448c0 17.7 14.3 32 32 32s32-14.3 32-32V396.9l17.6 17.5 0 0c87.5 87.4 229.3 87.4 316.7 0c24.4-24.4 42.1-53.1 52.9-83.7c5.9-16.7-2.9-34.9-19.5-40.8s-34.9 2.9-40.8 19.5c-7.7 21.8-20.2 42.3-37.8 59.8c-62.5 62.5-163.8 62.5-226.3 0l-.1-.1L125.6 352H176c17.7 0 32-14.3 32-32s-14.3-32-32-32H48.4c-1.6 0-3.2 .1-4.8 .3s-3.1 .5-4.6 1z"/></svg>'
+            )
+            kondisi = "Sama"
+
+        icon_vb = ui.HTML(
+                '<svg xmlns="http://www.w3.org/2000/svg" color="white" viewBox="0 0 384 512"><!--!Font Awesome Free 6.5.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2024 Fonticons, Inc.--><path d="M192 0a48 48 0 1 1 0 96 48 48 0 1 1 0-96zM120 383c-13.8-3.6-24-16.1-24-31V296.9l-4.6 7.6c-9.1 15.1-28.8 20-43.9 10.9s-20-28.8-10.9-43.9l58.3-97c15-24.9 40.3-41.5 68.7-45.6c4.1-.6 8.2-1 12.5-1h1.1 12.5H192c1.4 0 2.8 .1 4.1 .3c35.7 2.9 65.4 29.3 72.1 65l6.1 32.5c44.3 8.6 77.7 47.5 77.7 94.3v32c0 17.7-14.3 32-32 32H304 264v96c0 17.7-14.3 32-32 32s-32-14.3-32-32V384h-8-8v96c0 17.7-14.3 32-32 32s-32-14.3-32-32V383z"/></svg>'
+            )
+        
+        #icon_title_tes = "About tooltips"
+        # icons_fa = ui.HTML(
+        #     f'<svg aria-hidden="true" color="blue" role="img" viewBox="0 0 512 512" style="height:1em;width:1em;vertical-align:-0.125em;margin-left:auto;margin-right:auto;font-size:inherit;fill:currentColor;overflow:visible;position:relative;"><title>{icon_title}</title><path d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM216 336h24V272H216c-13.3 0-24-10.7-24-24s10.7-24 24-24h48c13.3 0 24 10.7 24 24v88h8c13.3 0 24 10.7 24 24s-10.7 24-24 24H216c-13.3 0-24-10.7-24-24s10.7-24 24-24zm40-208a32 32 0 1 1 0 64 32 32 0 1 1 0-64z"/></svg>'
+        # )
+        def fa_info_circle(icon_title: str, icons_fa):
+            # Enhanced from https://rstudio.github.io/fontawesome/ via `fontawesome::fa(&quot;info-circle&quot;, a11y = &quot;sem&quot;, title = icon_title)`
+            return ui.span(icon_title, " ", icons_fa)
+
+        judul_vb = fa_info_circle(icon_title, icons_fa)
+
+        if kondisi == "Naik":
+            penjelasan_unmet_need = "Naik dari capaian " + nilai_bulan_sebelum(filter_bulan) + " (" + str(unmet_need_bulan_lalu)  + ")"
+        elif kondisi == "Turun":
+             penjelasan_unmet_need ="Turun dari capaian " + nilai_bulan_sebelum(filter_bulan) + " (" + str(unmet_need_bulan_lalu)  + ")"
+        else:
+            penjelasan_unmet_need = "Sama dengan capaian " + nilai_bulan_sebelum(filter_bulan) + " (" + str(unmet_need_bulan_lalu)  + ")"
+
+        vb = ui.value_box(  
+            ui.span(judul_vb, style="font-size:20px; font-weight: bold;"),
+            unmet_need_bulan_ini,
+            penjelasan_unmet_need,
+            showcase= faicons.icon_svg("person-pregnant"),
+            theme=ui.ValueBoxTheme(class_="", bg = "#f6f8fa", fg = "#0B538E"),
             full_screen=True,
         )
         return(vb)
 
+    @render.ui
+    #@reactive.event(input.action_button)
+    def vb_tenakes():
+        filter_kabupaten = val_kab.get()
+        filter_kecamatan = val_kec.get()
+        filter_desa = val_desa.get()
+        filter_bulan = input.pilih_bulan()
+
+        data_tenakes = pl.read_excel("data/data_faskes_siga.xlsx")
+        data_tenakes = data_tenakes.filter(
+            pl.col("Kabupaten").is_in(filter_kabupaten),
+            pl.col("Kecamatan").is_in(filter_kecamatan),
+            pl.col("Kelurahan/Desa").is_in(filter_desa),
+            pl.col("BULAN").is_in([filter_bulan])
+        )
+        jumlah_tenakes = data_tenakes.height
+
+        if jumlah_tenakes <= 0:
+            jumlah_tenakes = 0
+        else:
+            jumlah_tenakes = jumlah_tenakes
+
+        vb = ui.value_box(  
+            ui.span("Tenaga Kesehatan KB", style="font-size:20px; font-weight: bold;"),
+            jumlah_tenakes,
+            showcase= faicons.icon_svg("user-nurse"),
+            theme=ui.ValueBoxTheme(class_="", bg = "#f6f8fa", fg = "#0B538E"),
+            full_screen=True,
+        )
+        return(vb)
+    
+    @render.ui
+    #@reactive.event(input.action_button)
+    def vb_tp_kb():
+        filter_kabupaten = val_kab.get()
+        filter_kecamatan = val_kec.get()
+        filter_desa = val_desa.get()
+        filter_bulan = input.pilih_bulan()
+
+        data_tp_kb = pl.read_excel("data/data_faskes_siga.xlsx")
+        data_tp_kb = data_tp_kb.filter(
+            pl.col("Kabupaten").is_in(filter_kabupaten),
+            pl.col("Kecamatan").is_in(filter_kecamatan),
+            pl.col("Kelurahan/Desa").is_in(filter_desa),
+            pl.col("BULAN").is_in([filter_bulan])
+        )
+        jumlah_tp_kb = len(data_tp_kb["No. Registrasi"].unique())
+
+        if jumlah_tp_kb <= 0:
+            jumlah_tp_kb = 0
+        else:
+            jumlah_tp_kb = jumlah_tp_kb
+
+        vb = ui.value_box(  
+            ui.span("Tempat Pelayanan KB", style="font-size:20px; font-weight: bold;"),
+            jumlah_tp_kb,
+            showcase= faicons.icon_svg("house-medical"),
+            theme=ui.ValueBoxTheme(class_="", bg = "#f6f8fa", fg = "#0B538E"),
+            full_screen=True,
+        )
+        return(vb)
+
+    @render.ui
+    #@reactive.event(input.action_button)
+    def vb_mkjp():
+        filter_kabupaten = val_kab.get()
+        filter_kecamatan = val_kec.get()
+        filter_desa = val_desa.get()
+        filter_bulan = input.pilih_bulan()
+        data_mkjp = pl.read_excel("data/data_mix_kontra.xlsx")
+
+        data_mkjp = data_mkjp.filter(
+            pl.col("Kabupaten").is_in(filter_kabupaten),
+            pl.col("Kecamatan").is_in(filter_kecamatan),
+            pl.col("Kelurahan/Desa").is_in(filter_desa),
+            pl.col("Bulan").is_in([filter_bulan])
+        )
+        mkjp_bulan_ini = data_mkjp["Implan"].sum() + data_mkjp["IUD"].sum() + data_mkjp["Vasektomi"].sum() + data_mkjp["Tubektomi"].sum()	
+        #unmet_need_bulan_ini
+
+        data_mkjp_bulan_lalu = pl.read_excel("data/data_mix_kontra.xlsx")
+
+        data_mkjp_bulan_lalu = data_mkjp_bulan_lalu.filter(
+            pl.col("Kabupaten").is_in(filter_kabupaten),
+            pl.col("Kecamatan").is_in(filter_kecamatan),
+            pl.col("Kelurahan/Desa").is_in(filter_desa),
+            pl.col("Bulan").is_in([nilai_bulan_sebelum(filter_bulan)])
+        )
+        mkjp_bulan_lalu = data_mkjp_bulan_lalu["Implan"].sum() + data_mkjp_bulan_lalu["IUD"].sum() + data_mkjp_bulan_lalu["Vasektomi"].sum() + data_mkjp_bulan_lalu["Tubektomi"].sum()
+        mkjp_bulan_lalu
+
+
+        if mkjp_bulan_ini > mkjp_bulan_lalu:
+            icon_title = "MKJP"
+            icons_fa = ui.HTML(
+                f'<svg aria-hidden="true" role="img" viewBox="0 0 384 512" style="height:1em;width:0.75em;vertical-align:-0.125em;margin-left:auto;margin-right:auto;font-size:inherit;fill:currentColor;overflow:visible;position:relative;"><path d="M214.6 41.4c-12.5-12.5-32.8-12.5-45.3 0l-160 160c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L160 141.2V448c0 17.7 14.3 32 32 32s32-14.3 32-32V141.2L329.4 246.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3l-160-160z"/></svg>'
+                )
+            kondisi = "Naik"
+        elif mkjp_bulan_ini < mkjp_bulan_lalu:
+            icon_title = "MKJP"
+            icons_fa = ui.HTML(
+                f'<svg aria-hidden="true" role="img" viewBox="0 0 384 512" style="height:1em;width:0.75em;vertical-align:-0.125em;margin-left:auto;margin-right:auto;font-size:inherit;fill:currentColor;overflow:visible;position:relative;"><path d="M169.4 470.6c12.5 12.5 32.8 12.5 45.3 0l160-160c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L224 370.8 224 64c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 306.7L54.6 265.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l160 160z"/></svg>'
+                )
+            kondisi = "Turun"
+        else:
+            icon_title = "MKJP"
+            icons_fa = ui.HTML(
+                f'<svg aria-hidden="true" role="img" viewBox="0 0 512 512" style="height:1em;width:1em;vertical-align:-0.125em;margin-left:auto;margin-right:auto;font-size:inherit;fill:currentColor;overflow:visible;position:relative;"><path d="M105.1 202.6c7.7-21.8 20.2-42.3 37.8-59.8c62.5-62.5 163.8-62.5 226.3 0L386.3 160H336c-17.7 0-32 14.3-32 32s14.3 32 32 32H463.5c0 0 0 0 0 0h.4c17.7 0 32-14.3 32-32V64c0-17.7-14.3-32-32-32s-32 14.3-32 32v51.2L414.4 97.6c-87.5-87.5-229.3-87.5-316.8 0C73.2 122 55.6 150.7 44.8 181.4c-5.9 16.7 2.9 34.9 19.5 40.8s34.9-2.9 40.8-19.5zM39 289.3c-5 1.5-9.8 4.2-13.7 8.2c-4 4-6.7 8.8-8.1 14c-.3 1.2-.6 2.5-.8 3.8c-.3 1.7-.4 3.4-.4 5.1V448c0 17.7 14.3 32 32 32s32-14.3 32-32V396.9l17.6 17.5 0 0c87.5 87.4 229.3 87.4 316.7 0c24.4-24.4 42.1-53.1 52.9-83.7c5.9-16.7-2.9-34.9-19.5-40.8s-34.9 2.9-40.8 19.5c-7.7 21.8-20.2 42.3-37.8 59.8c-62.5 62.5-163.8 62.5-226.3 0l-.1-.1L125.6 352H176c17.7 0 32-14.3 32-32s-14.3-32-32-32H48.4c-1.6 0-3.2 .1-4.8 .3s-3.1 .5-4.6 1z"/></svg>'
+            )
+            kondisi = "Sama"
+
+        icon_vb = ui.HTML(
+                '<svg xmlns="http://www.w3.org/2000/svg" color="white" viewBox="0 0 384 512"><!--!Font Awesome Free 6.5.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2024 Fonticons, Inc.--><path d="M192 0a48 48 0 1 1 0 96 48 48 0 1 1 0-96zM120 383c-13.8-3.6-24-16.1-24-31V296.9l-4.6 7.6c-9.1 15.1-28.8 20-43.9 10.9s-20-28.8-10.9-43.9l58.3-97c15-24.9 40.3-41.5 68.7-45.6c4.1-.6 8.2-1 12.5-1h1.1 12.5H192c1.4 0 2.8 .1 4.1 .3c35.7 2.9 65.4 29.3 72.1 65l6.1 32.5c44.3 8.6 77.7 47.5 77.7 94.3v32c0 17.7-14.3 32-32 32H304 264v96c0 17.7-14.3 32-32 32s-32-14.3-32-32V384h-8-8v96c0 17.7-14.3 32-32 32s-32-14.3-32-32V383z"/></svg>'
+            )
+
+        #icon_title_tes = "About tooltips"
+        # icons_fa = ui.HTML(
+        #     f'<svg aria-hidden="true" color="blue" role="img" viewBox="0 0 512 512" style="height:1em;width:1em;vertical-align:-0.125em;margin-left:auto;margin-right:auto;font-size:inherit;fill:currentColor;overflow:visible;position:relative;"><title>{icon_title}</title><path d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM216 336h24V272H216c-13.3 0-24-10.7-24-24s10.7-24 24-24h48c13.3 0 24 10.7 24 24v88h8c13.3 0 24 10.7 24 24s-10.7 24-24 24H216c-13.3 0-24-10.7-24-24s10.7-24 24-24zm40-208a32 32 0 1 1 0 64 32 32 0 1 1 0-64z"/></svg>'
+        # )
+        def fa_info_circle(icon_title: str, icons_fa):
+            # Enhanced from https://rstudio.github.io/fontawesome/ via `fontawesome::fa(&quot;info-circle&quot;, a11y = &quot;sem&quot;, title = icon_title)`
+            return ui.span(icon_title, " ", icons_fa)
+
+        judul_vb = fa_info_circle(icon_title, icons_fa)
+
+        if kondisi == "Naik":
+            penjelasan_mkjp = "Naik dari capaian " + nilai_bulan_sebelum(filter_bulan) + " (" + str(mkjp_bulan_lalu)  + ")"
+        elif kondisi == "Turun":
+                penjelasan_mkjp ="Turun dari capaian " + nilai_bulan_sebelum(filter_bulan) + " (" + str(mkjp_bulan_lalu)  + ")"
+        else:
+            penjelasan_mkjp = "Sama dengan capaian " + nilai_bulan_sebelum(filter_bulan) + " (" + str(mkjp_bulan_lalu)  + ")"
+
+        vb = ui.value_box(  
+            ui.span(judul_vb, style="font-size:20px; font-weight: bold;"),
+            mkjp_bulan_ini,
+            penjelasan_mkjp,
+            showcase= faicons.icon_svg("syringe"),
+            theme=ui.ValueBoxTheme(class_="", bg = "#f6f8fa", fg = "#0B538E"),
+            full_screen=True,
+        )
+        return vb
+
+    @render_widget
+    #@reactive.event(input.action_button)
+    def bar_mix_kontrasepsi():
+        filter_kabupaten = val_kab.get()
+        filter_kecamatan = val_kec.get()
+        filter_desa = val_desa.get()
+        filter_bulan =  bulan_hingga(input.pilih_bulan())
+        data_mkjp = pl.read_excel("data/data_mix_kontra.xlsx")
+
+        data_mkjp = data_mkjp.select(
+            pl.col("Suntik").sum(),
+            pl.col("Pil").sum(),
+            pl.col("Kondom").sum(),
+            pl.col("Implan").sum(),
+            pl.col("IUD").sum(),
+            pl.col("Vasektomi").sum(),
+            pl.col("Tubektomi").sum(),
+            pl.col("MAL").sum()
+        )
+
+        data_mkjp = data_mkjp.unpivot(on = ["Suntik", "Pil", "Kondom",
+                "Implan",	"IUD",	"Vasektomi",
+                "Tubektomi",	"MAL"], 
+                variable_name="Alokon", value_name="Total")
+        
+        df = data_mkjp.to_pandas()
+
+        # Mengurutkan data berdasarkan nilai terkecil ke terbesar
+        df = df.sort_values(by="Total")
+
+        # # Membuat bar chart dengan label
+        # fig = px.bar(df, x="Variable", y="Value", title="Bar Chart", labels={"Variable": "Metode Kontrasepsi", "Value": "Jumlah"}, text="Value")
+
+        grafik_kontrasepsi = px.bar(
+            df,
+            x="Alokon",
+            y="Total",
+            text="Total",
+            title="Penggunaan Metode Kontrasepsi"
+        )
+
+        # Menambahkan pengaturan layout
+        grafik_kontrasepsi.update_traces(marker_color='#0d6efd')
+        grafik_kontrasepsi.update_layout(
+            xaxis_title="Metode Kontrasepsi",
+            yaxis_title="Jumlah Penggunaan",
+            xaxis=dict(categoryorder="total ascending"),
+            font=dict(family="Arial"),
+            margin=dict(l=50, r=50, b=50, t=50),
+            paper_bgcolor="#f6f8fa",
+            plot_bgcolor="#f6f8fa",
+            hoverlabel=dict(
+                bgcolor="white",
+                font=dict(family="Arial")
+            ),
+            legend=dict(font=dict(family="Arial")),
+            hovermode="closest",
+            hoverdistance=30,
+            updatemenus=[dict(font=dict(family="Arial"))]
+        )
+
+        return grafik_kontrasepsi
+
+    @render_widget
+    #@reactive.event(input.action_button)
+    def donut_status_pelatihan():
+        filter_kabupaten = val_kab.get()
+        filter_kecamatan = val_kec.get()
+        filter_desa = val_desa.get()
+        filter_bulan = input.pilih_bulan()
+
+        data_bidan = pl.read_excel("data/data_faskes_siga.xlsx")
+
+        data_bidan = data_bidan.filter(
+            pl.col("Kabupaten").is_in(filter_kabupaten),
+            pl.col("Kecamatan").is_in(filter_kecamatan),
+            pl.col("Kelurahan/Desa").is_in(filter_desa),
+            pl.col("BULAN").is_in([filter_bulan])
+        )
+
+        data_bidan = data_bidan['Pelatihan']
+
+        df = pl.DataFrame(data_bidan)
+
+        # Konversi Polars DataFrame ke Pandas DataFrame
+        df_pd = df.to_pandas()
+
+        # Menambahkan kolom "Status Pelatihan" berdasarkan kondisi pada kolom "Pelatihan"
+        df_pd["Status Pelatihan"] = df_pd["Pelatihan"].apply(
+            lambda x: "Terlatih" if ("IUD" in x or "IMPLAN" in x) else "Tidak Terlatih"
+        )
+
+        # Plot donut chart menggunakan Plotly Express
+        count = df_pd["Status Pelatihan"].value_counts()
+        donut_status_pelatihan = px.pie(df_pd, names=count.index, values=count.values,
+                    color=count.index, color_discrete_map={'Tidak Terlatih': '#ffc107', 'Terlatih': '#0d6efd'},
+                    hole=0.5, title='Persentase Status Pelatihan Tenaga Kesehatan KB')
+
+        donut_status_pelatihan.update_layout(
+            xaxis_title="Metode Kontrasepsi",
+            yaxis_title="Jumlah Penggunaan",
+            xaxis=dict(categoryorder="total ascending"),
+            font=dict(family="Arial"),
+            margin=dict(l=50, r=50, b=50, t=50),
+            paper_bgcolor="#f6f8fa",
+            plot_bgcolor="#f6f8fa",
+            hoverlabel=dict(
+                bgcolor="white",
+                font=dict(family="Arial")
+            ),
+            legend=dict(font=dict(family="Arial")),
+            hovermode="closest",
+            hoverdistance=30,
+            updatemenus=[dict(font=dict(family="Arial"))]
+        )
+        return donut_status_pelatihan
+
+        
     ### akhir KB
 app = App(app_ui, server)
