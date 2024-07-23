@@ -14,6 +14,8 @@ import ipyleaflet
 
 import math
 
+import great_tables as gt
+
 daftar_bulan = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"]
 
 data_poktan = pl.read_csv("data/profil_poktan.csv")
@@ -57,6 +59,9 @@ def bulan_hingga(bulan_terpilih):
     daftar_bulan = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"]
     index = daftar_bulan.index(bulan_terpilih)
     return daftar_bulan[:index + 1]
+
+def format_number(number):
+    return f"{number:,}".replace(",", ".")
 
 app_ui = ui.page_navbar(
     ui.nav_panel(
@@ -118,6 +123,38 @@ app_ui = ui.page_navbar(
                             output_widget("bar_mix_kontrasepsi"),
                             output_widget("donut_status_pelatihan")
                         )
+                    ),
+                    ui.card(
+                        ui.row(
+                            ui.column(
+                                8,
+                                output_widget("line_pa"),
+                            ),
+                            ui.column(
+                                4,
+                                ui.row(
+                                    ui.value_box(
+                                        "Pasangan Usia Subur",
+                                        value=ui.output_ui("text_jumlah_pus"),
+                                        showcase=output_widget("line_vb_pus"),
+                                        theme=ui.ValueBoxTheme(class_="", bg = "#f6f8fa", fg = "#0B538E"),
+                                        showcase_layout="bottom",
+                                    )
+                                ),
+                                ui.row(
+                                    ui.value_box(
+                                        "MCPR",
+                                        value=ui.output_ui("text_jumlah_mcpr"),
+                                        showcase=output_widget("line_vb_mcpr"),
+                                        theme=ui.ValueBoxTheme(class_="", bg = "#f6f8fa", fg = "#0B538E"),
+                                        showcase_layout="bottom",
+                                    )
+                                )
+                            )
+                        ),
+                    ),
+                    ui.card(
+                        ui.output_ui("gt_tabel_bidan")
                     )
             ),
             ui.nav_panel(
@@ -919,6 +956,13 @@ def server(input, output, session):
         filter_bulan =  bulan_hingga(input.pilih_bulan())
         data_mkjp = pl.read_excel("data/data_mix_kontra.xlsx")
 
+        data_mkjp = data_mkjp.filter(
+            pl.col("Kabupaten").is_in(filter_kabupaten),
+            pl.col("Kecamatan").is_in(filter_kecamatan),
+            pl.col("Kelurahan/Desa").is_in(filter_desa),
+            pl.col("Bulan").is_in(filter_bulan)
+        )
+
         data_mkjp = data_mkjp.select(
             pl.col("Suntik").sum(),
             pl.col("Pil").sum(),
@@ -1027,6 +1071,357 @@ def server(input, output, session):
         )
         return donut_status_pelatihan
 
+    @render_widget
+    #@reactive.event(input.action_button)
+    def line_pa():
+        filter_kabupaten = val_kab.get()
+        filter_kecamatan = val_kec.get()
+        filter_desa = val_desa.get()
+        filter_bulan =  bulan_hingga(input.pilih_bulan())
+        data_pa = pl.read_excel("data/data_mix_kontra.xlsx")
+        data_pa = data_pa.filter(
+            pl.col("Kabupaten").is_in(filter_kabupaten),
+            pl.col("Kecamatan").is_in(filter_kecamatan),
+            pl.col("Kelurahan/Desa").is_in(filter_desa),
+            pl.col("Bulan").is_in(filter_bulan)
+        )
+        data_pa = data_pa.select(["PA", "Bulan"])
+        data_pa = data_pa.group_by("Bulan").agg([
+            pl.sum("PA")
+        ])
+
+        # Konversi kembali ke Pandas DataFrame untuk plotly
+        data_pa = data_pa.to_pandas()
+
+        # Menentukan urutan bulan
+        bulan_order = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"]
+        data_pa['Bulan'] = pd.Categorical(data_pa['Bulan'], categories=bulan_order, ordered=True)
+
+        # Mengurutkan DataFrame berdasarkan urutan bulan
+        data_pa = data_pa.sort_values('Bulan')
+
+        line_pa = px.line(data_pa, x="Bulan", y="PA", title="Tren Peserta KB Aktif", markers=True)
+
+        line_pa.update_layout(
+            xaxis_title="Metode Kontrasepsi",
+            yaxis_title="Jumlah Penggunaan",
+            #xaxis=dict(categoryorder="total ascending"),
+            font=dict(family="Arial"),
+            margin=dict(l=50, r=50, b=50, t=50),
+            paper_bgcolor="#f6f8fa",
+            plot_bgcolor="#f6f8fa",
+            hoverlabel=dict(
+                bgcolor="white",
+                font=dict(family="Arial")
+            ),
+            legend=dict(font=dict(family="Arial")),
+            hovermode="closest",
+            hoverdistance=30,
+            updatemenus=[dict(font=dict(family="Arial"))]
+        )
+        return line_pa
+
+    @render_widget
+    #@reactive.event(input.action_button)
+    def line_vb_pus():
+        filter_kabupaten = val_kab.get()
+        filter_kecamatan = val_kec.get()
+        filter_desa = val_desa.get()
+        filter_bulan = input.pilih_bulan()
         
+        data_pus = pl.read_excel("data/data_pus.xlsx")
+
+        hingga_bulan = bulan_hingga(filter_bulan)
+
+        data_pus = data_pus.filter(
+            pl.col("Kabupaten").is_in(filter_kabupaten),
+            pl.col("Kecamatan").is_in(filter_kecamatan),
+            pl.col("Kelurahan_Desa").is_in(filter_desa),
+            pl.col("Bulan").is_in(hingga_bulan)
+        )
+        data_pus = data_pus.select(["PUS", "Bulan"])
+        data_pus = data_pus.group_by("Bulan").agg([
+            pl.sum("PUS")
+        ])
+
+        data_pus = data_pus.to_pandas()
+
+        # Menentukan urutan bulan
+        bulan_order = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"]
+        data_pus['Bulan'] = pd.Categorical(data_pus['Bulan'], categories=bulan_order, ordered=True)
+
+        # Mengurutkan DataFrame berdasarkan urutan bulan
+        data_pus = data_pus.sort_values('Bulan')
+
+
+        line_pus = px.line(data_pus, x="Bulan", y="PUS",  markers=True)
+        # line_pus.update_traces(
+        #     line_color="#406EF1",
+        #     line_width=1,
+        #     fill="tozeroy",
+        #     fillcolor="rgba(64,110,241,0.2)",
+        #     hoverinfo="y",
+        # )
+        line_pus.update_xaxes(visible=False, showgrid=False)
+        line_pus.update_yaxes(visible=False, showgrid=False)
+        line_pus.update_layout(
+            paper_bgcolor="#f6f8fa",
+            plot_bgcolor="#f6f8fa"
+        )
+        return line_pus
+        
+    @render.text  
+    #@reactive.event(input.action_button)
+    def text_jumlah_pus():  
+        filter_kabupaten = val_kab.get()
+        filter_kecamatan = val_kec.get()
+        filter_desa = val_desa.get()
+        filter_bulan = input.pilih_bulan()
+        
+        data_pus = pl.read_excel("data/data_pus.xlsx")
+
+        data_pus = data_pus.filter(
+            pl.col("Kabupaten").is_in(filter_kabupaten),
+            pl.col("Kecamatan").is_in(filter_kecamatan),
+            pl.col("Kelurahan_Desa").is_in(filter_desa),
+            pl.col("Bulan").is_in([filter_bulan])
+        )
+        data_pus = data_pus['PUS'].sum()
+        data_pus = format_number(data_pus)
+        return data_pus
+    
+    @render_widget
+    #@reactive.event(input.action_button)
+    def line_vb_mcpr():
+        filter_kabupaten = val_kab.get()
+        filter_kecamatan = val_kec.get()
+        filter_desa = val_desa.get()
+        filter_bulan = input.pilih_bulan()
+
+        hingga_bulan = bulan_hingga(filter_bulan)
+
+        #MCPR
+        data_pus = pl.read_excel("data/data_pus.xlsx")
+
+        data_pus = data_pus.filter(
+            pl.col("Kabupaten").is_in(filter_kabupaten),
+            pl.col("Kecamatan").is_in(filter_kecamatan),
+            pl.col("Kelurahan_Desa").is_in(filter_desa),
+            pl.col("Bulan").is_in(hingga_bulan)
+        )
+        data_pus = data_pus.select(["PUS", "Bulan"])
+        data_pus = data_pus.group_by("Bulan").agg([
+            pl.sum("PUS")
+        ])
+
+        #MCPR
+        data_mcpr = pl.read_excel("data/data_mix_kontra.xlsx")
+
+        hingga_bulan = bulan_hingga("JUNI")
+
+        data_mcpr = data_mcpr.filter(
+            pl.col("Kabupaten").is_in(filter_kabupaten),
+            pl.col("Kecamatan").is_in(filter_kecamatan),
+            pl.col("Kelurahan/Desa").is_in(filter_desa),
+            pl.col("Bulan").is_in(hingga_bulan)
+        )
+        data_mcpr = data_mcpr.select(["KB Modern", "Bulan"])
+        data_mcpr = data_mcpr.group_by("Bulan").agg([
+            pl.sum("KB Modern")
+        ])
+
+        data_mcpr = data_mcpr.join(data_pus, on="Bulan", how="inner")
+
+        data_mcpr = data_mcpr.with_columns(
+            (pl.col("KB Modern") / pl.col("PUS") * 100).round(2).alias("MCPR")
+        )
+
+        data_mcpr = data_mcpr.to_pandas()
+
+        # Menentukan urutan bulan
+        bulan_order = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"]
+        data_mcpr['Bulan'] = pd.Categorical(data_mcpr['Bulan'], categories=bulan_order, ordered=True)
+
+        # Mengurutkan DataFrame berdasarkan urutan bulan
+        data_mcpr = data_mcpr.sort_values('Bulan')
+
+
+        line_mcpr = px.line(data_mcpr, x="Bulan", y="MCPR",  markers=True)
+        # line_pus.update_traces(
+        #     line_color="#406EF1",
+        #     line_width=1,
+        #     fill="tozeroy",
+        #     fillcolor="rgba(64,110,241,0.2)",
+        #     hoverinfo="y",
+        # )
+        line_mcpr.update_xaxes(visible=False, showgrid=False)
+        line_mcpr.update_yaxes(visible=False, showgrid=False)
+        line_mcpr.update_layout(
+            paper_bgcolor="#f6f8fa",
+            plot_bgcolor="#f6f8fa"
+        )
+        return line_mcpr
+        
+    @render.text  
+    #@reactive.event(input.action_button)
+    def text_jumlah_mcpr():  
+        filter_kabupaten = val_kab.get()
+        filter_kecamatan = val_kec.get()
+        filter_desa = val_desa.get()
+        filter_bulan = input.pilih_bulan()
+
+        #MCPR
+        data_pus = pl.read_excel("data/data_pus.xlsx")
+
+        data_pus = data_pus.filter(
+            pl.col("Kabupaten").is_in(filter_kabupaten),
+            pl.col("Kecamatan").is_in(filter_kecamatan),
+            pl.col("Kelurahan_Desa").is_in(filter_desa),
+            pl.col("Bulan").is_in([filter_bulan])
+        )
+        data_pus = data_pus.select(["PUS", "Bulan"])
+        data_pus = data_pus.group_by("Bulan").agg([
+            pl.sum("PUS")
+        ])
+
+        #MCPR
+        data_mcpr = pl.read_excel("data/data_mix_kontra.xlsx")
+
+        data_mcpr = data_mcpr.filter(
+            pl.col("Kabupaten").is_in(filter_kabupaten),
+            pl.col("Kecamatan").is_in(filter_kecamatan),
+            pl.col("Kelurahan/Desa").is_in(filter_desa),
+            pl.col("Bulan").is_in([filter_bulan])
+        )
+        data_mcpr = data_mcpr.select(["KB Modern", "Bulan"])
+        data_mcpr = data_mcpr.group_by("Bulan").agg([
+            pl.sum("KB Modern")
+        ])
+
+        data_mcpr = data_mcpr.join(data_pus, on="Bulan", how="inner")
+
+        data_mcpr = data_mcpr.with_columns(
+            (pl.col("KB Modern") / pl.col("PUS") * 100).round(2).alias("MCPR")
+        )
+
+        data_mcpr = data_mcpr["MCPR"].sum()
+
+        data_mcpr = format_number(data_mcpr)
+        return data_mcpr + "%"
+    
+    @reactive.calc
+    #@reactive.event(input.action_button)  
+    def tabel_bidan():
+        filter_kabupaten = val_kab.get()
+        filter_kecamatan = val_kec.get()
+        filter_desa = val_desa.get()
+        filter_bulan = input.pilih_bulan()
+
+        data_bidan = pl.read_excel("data/data_faskes_siga.xlsx")
+
+        data_bidan = data_bidan.filter(
+            pl.col("Kabupaten").is_in(filter_kabupaten),
+            pl.col("Kecamatan").is_in(filter_kecamatan),
+            pl.col("Kelurahan/Desa").is_in(filter_desa),
+            pl.col("BULAN").is_in([filter_bulan])
+        )			 		
+
+        data_bidan = data_bidan.select(
+            pl.col("Provinsi"), pl.col("Kabupaten"),
+            pl.col("Kecamatan"), pl.col("Kelurahan/Desa"), pl.col("Nama Faskes"),
+            pl.col("Nama Bidan"), pl.col("Pelatihan")
+        )
+
+        df = pl.DataFrame(data_bidan)
+
+        # Konversi Polars DataFrame ke Pandas DataFrame
+        df_pd = df.to_pandas()
+
+        # Menambahkan kolom "Status Pelatihan" berdasarkan kondisi pada kolom "Pelatihan"
+        df_pd["Pelatihan"] = df_pd["Pelatihan"].apply(
+            lambda x: "Terlatih" if ("IUD" in x or "IMPLAN" in x) else "Belum Terlatih"
+        )
+
+        df_pd = pl.DataFrame(df_pd)
+        
+        if input.pilih_kab() == "SEMUA KABUPATEN":
+            # Mengelompokkan data dan menghitung jumlahnya
+            summary = df_pd.group_by(['Kabupaten', 'Pelatihan']).agg(
+                pl.col('Nama Bidan').count().alias('count')
+            )
+
+            # Mengubah format agar serupa dengan unstack di pandas
+            summary_pivot = summary.pivot(
+                values='count',
+                index=['Kabupaten'],
+                on='Pelatihan'
+            ).fill_null(0)
+            # Menghitung total untuk kolom "Belum Terlatih" dan "Terlatih"
+            summary_pivot = summary_pivot.to_pandas()
+            # Menghitung total untuk kolom "Belum Terlatih" dan "Terlatih"
+            total_belum_terlatih = summary_pivot['Belum Terlatih'].sum()
+            total_terlatih = summary_pivot['Terlatih'].sum()
+
+            # Menambahkan baris total ke DataFrame
+            total_row = pd.DataFrame({
+                'Kabupaten': ['TOTAL'],
+                'Belum Terlatih': [total_belum_terlatih],
+                'Terlatih': [total_terlatih]
+            })
+
+            summary_pivot = pd.concat([summary_pivot, total_row])
+
+        elif input.pilih_kab() != "SEMUA KABUPATEN" and input.pilih_kec() == "SEMUA KECAMATAN":
+            # Mengelompokkan data dan menghitung jumlahnya
+            summary = df_pd.group_by(['Kabupaten', 'Kecamatan', 'Pelatihan']).agg(
+                pl.col('Nama Bidan').count().alias('count')
+            )
+
+            summary_pivot = summary.pivot(
+                values='count',
+                index=['Kabupaten', 'Kecamatan'],
+                on='Pelatihan'
+            ).fill_null(0)
+            summary_pivot = summary_pivot.sort(['Kabupaten', 'Kecamatan'])
+            
+
+
+        elif input.pilih_kab() != "SEMUA KABUPATEN" and input.pilih_kec() != "SEMUA KECAMATAN" and input.pilih_desa() == "SEMUA DESA/KELURAHAN":
+            # Mengelompokkan data dan menghitung jumlahnya
+            summary = df_pd.group_by(['Kabupaten', 'Kecamatan', 'Kelurahan/Desa', 'Pelatihan']).agg(
+                pl.col('Nama Bidan').count().alias('count')
+            )
+
+            summary_pivot = summary.pivot(
+                values='count',
+                index=['Kabupaten', 'Kecamatan', 'Kelurahan/Desa'],
+                on='Pelatihan'
+            ).fill_null(0)
+            summary_pivot = summary_pivot.sort(['Kabupaten', 'Kecamatan', 'Kelurahan/Desa'])
+
+        else:
+            summary = df_pd.group_by(['Kabupaten', 'Kecamatan', 'Kelurahan/Desa', 'Nama Faskes', 'Pelatihan']).agg(
+                pl.col('Nama Bidan').count().alias('count')
+            )
+
+            # Mengubah format agar serupa dengan unstack di pandas
+            summary_pivot = summary.pivot(
+                values='count',
+                index=['Kabupaten', 'Kecamatan', 'Kelurahan/Desa', 'Nama Faskes'],
+                on='Pelatihan'
+            ).fill_null(0)
+
+        return summary_pivot
+    
+    @render.ui
+    def gt_tabel_bidan():
+        #min_date_str, max_date_str = input_date_range_str()
+        df = tabel_bidan()
+        table = (
+            gt.GT(
+                data=df)
+            .tab_header(title="Tabel Tenaga Kesehatan KB")
+        )
+        return table
     ### akhir KB
 app = App(app_ui, server)
