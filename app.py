@@ -6,6 +6,8 @@ import plotly.express as px
 import plotly.io as pio 
 import faicons
 
+import shiny as pyshiny
+
 import pandas as pd
 from great_tables import GT, exibble, loc, style
 from ipyleaflet import Map 
@@ -15,6 +17,10 @@ import ipyleaflet
 import math
 
 import great_tables as gt
+from itables.sample_dfs import get_countries
+from itables.shiny import DT
+
+from pathlib import Path
 
 daftar_bulan = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"]
 
@@ -71,7 +77,7 @@ app_ui = ui.page_navbar(
             ui.input_selectize("pilih_kec", "Pilih Kecamatan", choices=[], multiple=False),
             ui.input_selectize("pilih_desa", "Pilih Desa/Kelurahan", choices=[], multiple=False),
             ui.input_selectize("pilih_bulan", "BULAN", 
-                                  choices=daftar_bulan[:6], selected="JUNI")
+                                choices=daftar_bulan[:6], selected="JUNI")
         ),
         ui.input_action_button(
             "action_button", "Tampilkan Data"
@@ -118,43 +124,37 @@ app_ui = ui.page_navbar(
                         ui.output_ui("vb_tp_kb"),
                         ui.output_ui("vb_mkjp")
                     ),
-                    ui.card(
-                        ui.layout_column_wrap(
-                            output_widget("bar_mix_kontrasepsi"),
-                            output_widget("donut_status_pelatihan")
+                    ui.layout_column_wrap(
+                        ui.value_box(
+                            "Pasangan Usia Subur",
+                            value=ui.output_ui("text_jumlah_pus"),
+                            showcase=output_widget("line_vb_pus"),
+                            theme=ui.ValueBoxTheme(class_="", bg = "#f6f8fa", fg = "#0B538E"),
+                            showcase_layout="bottom",
+                        ),
+                        ui.value_box(
+                            "MCPR",
+                            value=ui.output_ui("text_jumlah_mcpr"),
+                            showcase=output_widget("line_vb_mcpr"),
+                            theme=ui.ValueBoxTheme(class_="", bg = "#f6f8fa", fg = "#0B538E"),
+                            showcase_layout="bottom",
                         )
                     ),
                     ui.card(
-                        ui.row(
-                            ui.column(
-                                8,
-                                output_widget("line_pa"),
-                            ),
-                            ui.column(
-                                4,
-                                ui.row(
-                                    ui.value_box(
-                                        "Pasangan Usia Subur",
-                                        value=ui.output_ui("text_jumlah_pus"),
-                                        showcase=output_widget("line_vb_pus"),
-                                        theme=ui.ValueBoxTheme(class_="", bg = "#f6f8fa", fg = "#0B538E"),
-                                        showcase_layout="bottom",
-                                    )
-                                ),
-                                ui.row(
-                                    ui.value_box(
-                                        "MCPR",
-                                        value=ui.output_ui("text_jumlah_mcpr"),
-                                        showcase=output_widget("line_vb_mcpr"),
-                                        theme=ui.ValueBoxTheme(class_="", bg = "#f6f8fa", fg = "#0B538E"),
-                                        showcase_layout="bottom",
-                                    )
-                                )
-                            )
-                        ),
+                        ui.layout_column_wrap(
+                            output_widget("bar_mix_kontrasepsi"),
+                            output_widget("line_pa"),
+                            output_widget("donut_status_pelatihan")
+                        )
                     ),
-                    ui.card(
-                        ui.output_ui("gt_tabel_bidan")
+                    ui.layout_column_wrap(
+                        ui.tags.h1("Rekap Status Pelatihan", style="font-size: 24px; font-weight: bold; margin: 20px 0; text-align: center; color:black"),
+                        ui.tags.h1("Rincian Status Pelatihan", style="font-size: 24px; font-weight: bold; margin: 20px 0; text-align: center; color:black"),
+                        
+                    ),
+                    ui.layout_column_wrap(
+                        ui.output_ui("rekap_tabel_bidan"),
+                        ui.output_ui("tabel_bidan")
                     )
             ),
             ui.nav_panel(
@@ -166,8 +166,7 @@ app_ui = ui.page_navbar(
     ui.nav_panel(
         "Download Data", "ini"
     ),
-    title="Desa Profil",
-    theme=shinyswatch.theme.cerulean()
+    title="Profil Desa"
 )
 
 
@@ -989,10 +988,11 @@ def server(input, output, session):
 
         grafik_kontrasepsi = px.bar(
             df,
-            x="Alokon",
-            y="Total",
+            x="Total",
+            y="Alokon",
             text="Total",
-            title="Penggunaan Metode Kontrasepsi"
+            title="Penggunaan Metode Kontrasepsi",
+            orientation='h'
         )
 
         # Menambahkan pengaturan layout
@@ -1311,7 +1311,53 @@ def server(input, output, session):
     
     @reactive.calc
     #@reactive.event(input.action_button)  
+    def data_bidan():
+        filter_kabupaten = val_kab.get()
+        filter_kecamatan = val_kec.get()
+        filter_desa = val_desa.get()
+        filter_bulan = input.pilih_bulan()
+
+        data_bidan = pl.read_excel("data/data_faskes_siga.xlsx")
+
+        data_bidan = data_bidan.filter(
+            pl.col("Kabupaten").is_in(filter_kabupaten),
+            pl.col("Kecamatan").is_in(filter_kecamatan),
+            pl.col("Kelurahan/Desa").is_in(filter_desa),
+            pl.col("BULAN").is_in([filter_bulan])
+        )			 		
+
+        data_bidan = data_bidan.select(
+            pl.col("Provinsi"), pl.col("Kabupaten"),
+            pl.col("Kecamatan"), pl.col("Kelurahan/Desa"), pl.col("Nama Faskes"),
+            pl.col("Nama Bidan"), pl.col("Pelatihan")
+        )
+
+        df = pl.DataFrame(data_bidan)
+
+        # Konversi Polars DataFrame ke Pandas DataFrame
+        df_pd = df.to_pandas()
+
+        # Menambahkan kolom "Status Pelatihan" berdasarkan kondisi pada kolom "Pelatihan"
+        df_pd["Pelatihan"] = df_pd["Pelatihan"].apply(
+            lambda x: "Terlatih" if ("IUD" in x or "IMPLAN" in x) else "Belum Terlatih"
+        )
+
+        df_pd = pl.DataFrame(df_pd)
+        return df_pd
+
+    @render.ui
     def tabel_bidan():
+        df = data_bidan()
+        df = pl.DataFrame(df)
+        df = df.with_columns(pl.arange(1, df.height + 1).alias("No")).select(["No", *df.columns])
+        return ui.HTML(DT(df, scrollY="400px", scrollCollapse=True, paging=False,
+                          search={"regex": True, "caseInsensitive": True},
+                          buttons=["copyHtml5", "csvHtml5", "excelHtml5"]))
+
+
+    @reactive.calc
+    #@reactive.event(input.action_button)  
+    def rekap_data_bidan():
         filter_kabupaten = val_kab.get()
         filter_kecamatan = val_kec.get()
         filter_desa = val_desa.get()
@@ -1356,20 +1402,6 @@ def server(input, output, session):
                 index=['Kabupaten'],
                 on='Pelatihan'
             ).fill_null(0)
-            # Menghitung total untuk kolom "Belum Terlatih" dan "Terlatih"
-            summary_pivot = summary_pivot.to_pandas()
-            # Menghitung total untuk kolom "Belum Terlatih" dan "Terlatih"
-            total_belum_terlatih = summary_pivot['Belum Terlatih'].sum()
-            total_terlatih = summary_pivot['Terlatih'].sum()
-
-            # Menambahkan baris total ke DataFrame
-            total_row = pd.DataFrame({
-                'Kabupaten': ['TOTAL'],
-                'Belum Terlatih': [total_belum_terlatih],
-                'Terlatih': [total_terlatih]
-            })
-
-            summary_pivot = pd.concat([summary_pivot, total_row])
 
         elif input.pilih_kab() != "SEMUA KABUPATEN" and input.pilih_kec() == "SEMUA KECAMATAN":
             # Mengelompokkan data dan menghitung jumlahnya
@@ -1384,8 +1416,6 @@ def server(input, output, session):
             ).fill_null(0)
             summary_pivot = summary_pivot.sort(['Kabupaten', 'Kecamatan'])
             
-
-
         elif input.pilih_kab() != "SEMUA KABUPATEN" and input.pilih_kec() != "SEMUA KECAMATAN" and input.pilih_desa() == "SEMUA DESA/KELURAHAN":
             # Mengelompokkan data dan menghitung jumlahnya
             summary = df_pd.group_by(['Kabupaten', 'Kecamatan', 'Kelurahan/Desa', 'Pelatihan']).agg(
@@ -1411,17 +1441,40 @@ def server(input, output, session):
                 on='Pelatihan'
             ).fill_null(0)
 
+            # Menambah kolom 'Terlatih' jika belum ada
+            if 'Terlatih' not in summary_pivot.columns:
+                summary_pivot = summary_pivot.with_columns(pl.lit(0).alias('Terlatih'))
+            elif 'Belum Terlatih' not in summary_pivot.columns:
+                summary_pivot = summary_pivot.with_columns(pl.lit(0).alias('Belum Terlatih'))
+
+            # Atur urutan kolom agar 'Terlatih' berada di urutan yang diinginkan
+            columns_order = ['Provinsi', 'Kabupaten', 'Kecamatan', 'Kelurahan/Desa', 'Nama Faskes', 'Nama Bidan', 'Belum Terlatih', 'Terlatih']
+            summary_pivot = summary_pivot.select(columns_order)
+        # Menghitung total untuk kolom "Belum Terlatih" dan "Terlatih"
+        summary_pivot = summary_pivot.to_pandas()
+        # Menghitung total untuk kolom "Belum Terlatih" dan "Terlatih"
+        total_belum_terlatih = summary_pivot['Belum Terlatih'].sum()
+        total_terlatih = summary_pivot['Terlatih'].sum()
+
+        # Menambahkan baris total ke DataFrame
+        total_row = pd.DataFrame({
+            'Kabupaten': ['TOTAL'],
+            'Belum Terlatih': [total_belum_terlatih],
+            'Terlatih': [total_terlatih]
+        })
+
+        summary_pivot = pd.concat([summary_pivot, total_row])
+        summary_pivot['Jumlah Bidan'] = summary_pivot['Belum Terlatih'] + summary_pivot['Terlatih']
         return summary_pivot
-    
+
     @render.ui
-    def gt_tabel_bidan():
-        #min_date_str, max_date_str = input_date_range_str()
-        df = tabel_bidan()
-        table = (
-            gt.GT(
-                data=df)
-            .tab_header(title="Tabel Tenaga Kesehatan KB")
-        )
-        return table
+    def rekap_tabel_bidan():
+        df = rekap_data_bidan()
+        df = pl.DataFrame(df)
+        df = df.with_columns(pl.arange(1, df.height + 1).alias("No")).select(["No", *df.columns])
+        return ui.HTML(DT(df, scrollY="400px", scrollCollapse=True, paging=False,
+                          search={"regex": True, "caseInsensitive": True},
+                          buttons=["copyHtml5", "csvHtml5", "excelHtml5"]))
     ### akhir KB
-app = App(app_ui, server)
+www_dir = Path(__file__).parent / "www"
+app = App(app_ui, server, static_assets=www_dir)
