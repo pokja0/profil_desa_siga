@@ -148,9 +148,8 @@ app_ui = ui.page_navbar(
                         )
                     ),
                     ui.layout_column_wrap(
-                        ui.tags.h1("Rekap Status Pelatihan", style="font-size: 24px; font-weight: bold; margin: 20px 0; text-align: center; color:black"),
-                        ui.tags.h1("Rincian Status Pelatihan", style="font-size: 24px; font-weight: bold; margin: 20px 0; text-align: center; color:black"),
-                        
+                        ui.tags.h1("Rekap dan Rincian Status Pelatihan", style="font-size: 24px; font-weight: bold; margin: 20px 0; text-align: center; color:black")
+
                     ),
                     ui.layout_column_wrap(
                         ui.output_ui("rekap_tabel_bidan"),
