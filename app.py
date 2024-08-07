@@ -357,7 +357,7 @@ def server(input, output, session):
 
         data_poktan = data_poktan.unpivot(["Desa/Kel", "Kampung KB", "Rumah DataKu",
                             "BKB", "BKR", "BKL", "UPPKA", "PIK-R"], 
-                            variable_name="Variable", value_name="Value")
+                            variable_name="Poktan", value_name="Keterangan")
         # data_poktan = pl.read_csv("data/profil_poktan.csv")
             
         # data_poktan = data_poktan.filter(pl.col("KABUPATEN").is_in(filter_kabupaten),
@@ -400,7 +400,7 @@ def server(input, output, session):
 
         # Membuat DataFrame hasil
         results = pl.DataFrame({
-            "Variable": ["Luas Wilayah", "Jumlah Penduduk", "Kepadatan Penduduk"],
+            "Indikator": ["Luas Wilayah", "Jumlah Penduduk", "Kepadatan Penduduk"],
             "Nilai": [total_luas_wilayah, total_jumlah_penduduk, avg_kepadatan_penduduk]
         })
         return GT(results)
@@ -1447,7 +1447,7 @@ def server(input, output, session):
                 summary_pivot = summary_pivot.with_columns(pl.lit(0).alias('Belum Terlatih'))
 
             # Atur urutan kolom agar 'Terlatih' berada di urutan yang diinginkan
-            columns_order = ['Provinsi', 'Kabupaten', 'Kecamatan', 'Kelurahan/Desa', 'Nama Faskes', 'Nama Bidan', 'Belum Terlatih', 'Terlatih']
+            columns_order = ['Kabupaten', 'Kecamatan', 'Kelurahan/Desa', 'Nama Faskes', 'Belum Terlatih', 'Terlatih']
             summary_pivot = summary_pivot.select(columns_order)
         # Menghitung total untuk kolom "Belum Terlatih" dan "Terlatih"
         summary_pivot = summary_pivot.to_pandas()
