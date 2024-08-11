@@ -1,5 +1,7 @@
 from shiny import App, Inputs, Outputs, Session, reactive, render, ui
 import shinyswatch
+from htmltools import css
+
 import polars as pl
 from shinywidgets import output_widget, render_widget  
 import plotly.express as px
@@ -21,6 +23,7 @@ from itables.sample_dfs import get_countries
 from itables.shiny import DT
 
 from pathlib import Path
+import asyncio
 
 daftar_bulan = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"]
 
@@ -71,7 +74,8 @@ def format_number(number):
 
 app_ui = ui.page_navbar(
     ui.nav_panel(
-        "Dashboard", 
+        "Dashboard",
+        #ui.img(src = "https://bkkbnsulbar.id/wp-content/uploads/2022/12/cropped-logobkkbnsulbar.png", height = "100px"),
         ui.layout_column_wrap(
             ui.input_selectize("pilih_kab", "Pilih Kabupaten", choices=[], multiple=False),
             ui.input_selectize("pilih_kec", "Pilih Kecamatan", choices=[], multiple=False),
@@ -110,11 +114,11 @@ app_ui = ui.page_navbar(
                         ui.output_data_frame("tabel_piramida")
                     )
                 ),
-                ui.layout_column_wrap(
-                    ui.card(
-                        ui.output_data_frame("df")
-                    )
-                )
+                # ui.layout_column_wrap(
+                #     ui.card(
+                #         ui.output_data_frame("df")
+                #     )
+                # )
             ),
             ui.nav_panel(
                 "Keluarga Berencana",
@@ -170,7 +174,6 @@ app_ui = ui.page_navbar(
 
 
 def server(input, output, session):
-
     @reactive.effect
     def _():
         daftar_kab = data_poktan['KABUPATEN'].unique()
@@ -295,19 +298,19 @@ def server(input, output, session):
 
     ### Profil
 
-    @render.data_frame
-    #@reactive.event(input.action_button)
-    def df():
-        filter_kabupaten = val_kab.get()
-        filter_kecamatan = val_kec.get()
-        filter_desa = val_desa.get()
-        data_poktan = pl.read_csv("data/profil_poktan.csv")
+    # @render.data_frame
+    # @reactive.event(input.action_button)
+    # def df():
+    #     filter_kabupaten = val_kab.get()
+    #     filter_kecamatan = val_kec.get()
+    #     filter_desa = val_desa.get()
+    #     data_poktan = pl.read_csv("data/profil_poktan.csv")
             
-        data_poktan = data_poktan.filter(pl.col("KABUPATEN").is_in(filter_kabupaten),
-                                         pl.col("KECAMATAN").is_in(filter_kecamatan),
-                                         pl.col("KELURAHAN").is_in(filter_desa)
-                                        )
-        return render.DataGrid(data_poktan)  
+    #     data_poktan = data_poktan.filter(pl.col("KABUPATEN").is_in(filter_kabupaten),
+    #                                      pl.col("KECAMATAN").is_in(filter_kecamatan),
+    #                                      pl.col("KELURAHAN").is_in(filter_desa)
+    #                                     )
+    #     return render.DataGrid(data_poktan)  
     
     @render_widget  
     @reactive.event(input.action_button)
@@ -724,7 +727,7 @@ def server(input, output, session):
         return fig
 
     @render.ui
-    #@reactive.event(input.action_button)
+    @reactive.event(input.action_button)
     def vb_unmet_need():
         filter_kabupaten = val_kab.get()
         filter_kecamatan = val_kec.get()
@@ -804,7 +807,7 @@ def server(input, output, session):
         return(vb)
 
     @render.ui
-    #@reactive.event(input.action_button)
+    @reactive.event(input.action_button)
     def vb_tenakes():
         filter_kabupaten = val_kab.get()
         filter_kecamatan = val_kec.get()
@@ -835,7 +838,7 @@ def server(input, output, session):
         return(vb)
     
     @render.ui
-    #@reactive.event(input.action_button)
+    @reactive.event(input.action_button)
     def vb_tp_kb():
         filter_kabupaten = val_kab.get()
         filter_kecamatan = val_kec.get()
@@ -866,7 +869,7 @@ def server(input, output, session):
         return(vb)
 
     @render.ui
-    #@reactive.event(input.action_button)
+    @reactive.event(input.action_button)
     def vb_mkjp():
         filter_kabupaten = val_kab.get()
         filter_kecamatan = val_kec.get()
@@ -946,7 +949,7 @@ def server(input, output, session):
         return vb
 
     @render_widget
-    #@reactive.event(input.action_button)
+    @reactive.event(input.action_button)
     def bar_mix_kontrasepsi():
         filter_kabupaten = val_kab.get()
         filter_kecamatan = val_kec.get()
@@ -1017,7 +1020,7 @@ def server(input, output, session):
         return grafik_kontrasepsi
 
     @render_widget
-    #@reactive.event(input.action_button)
+    @reactive.event(input.action_button)
     def donut_status_pelatihan():
         filter_kabupaten = val_kab.get()
         filter_kecamatan = val_kec.get()
@@ -1071,7 +1074,7 @@ def server(input, output, session):
         return donut_status_pelatihan
 
     @render_widget
-    #@reactive.event(input.action_button)
+    @reactive.event(input.action_button)
     def line_pa():
         filter_kabupaten = val_kab.get()
         filter_kecamatan = val_kec.get()
@@ -1121,7 +1124,7 @@ def server(input, output, session):
         return line_pa
 
     @render_widget
-    #@reactive.event(input.action_button)
+    @reactive.event(input.action_button)
     def line_vb_pus():
         filter_kabupaten = val_kab.get()
         filter_kecamatan = val_kec.get()
@@ -1170,7 +1173,7 @@ def server(input, output, session):
         return line_pus
         
     @render.text  
-    #@reactive.event(input.action_button)
+    @reactive.event(input.action_button)
     def text_jumlah_pus():  
         filter_kabupaten = val_kab.get()
         filter_kecamatan = val_kec.get()
@@ -1190,7 +1193,7 @@ def server(input, output, session):
         return data_pus
     
     @render_widget
-    #@reactive.event(input.action_button)
+    @reactive.event(input.action_button)
     def line_vb_mcpr():
         filter_kabupaten = val_kab.get()
         filter_kecamatan = val_kec.get()
@@ -1262,7 +1265,7 @@ def server(input, output, session):
         return line_mcpr
         
     @render.text  
-    #@reactive.event(input.action_button)
+    @reactive.event(input.action_button)
     def text_jumlah_mcpr():  
         filter_kabupaten = val_kab.get()
         filter_kecamatan = val_kec.get()
@@ -1309,7 +1312,7 @@ def server(input, output, session):
         return data_mcpr + "%"
     
     @reactive.calc
-    #@reactive.event(input.action_button)  
+    @reactive.event(input.action_button)  
     def data_bidan():
         filter_kabupaten = val_kab.get()
         filter_kecamatan = val_kec.get()
@@ -1345,6 +1348,7 @@ def server(input, output, session):
         return df_pd
 
     @render.ui
+    @reactive.event(input.action_button)  
     def tabel_bidan():
         df = data_bidan()
         df = pl.DataFrame(df)
@@ -1353,9 +1357,8 @@ def server(input, output, session):
                           search={"regex": True, "caseInsensitive": True},
                           buttons=["copyHtml5", "csvHtml5", "excelHtml5"]))
 
-
     @reactive.calc
-    #@reactive.event(input.action_button)  
+    @reactive.event(input.action_button)  
     def rekap_data_bidan():
         filter_kabupaten = val_kab.get()
         filter_kecamatan = val_kec.get()
@@ -1467,6 +1470,7 @@ def server(input, output, session):
         return summary_pivot
 
     @render.ui
+    @reactive.event(input.action_button)  
     def rekap_tabel_bidan():
         df = rekap_data_bidan()
         df = pl.DataFrame(df)
@@ -1475,5 +1479,21 @@ def server(input, output, session):
                           search={"regex": True, "caseInsensitive": True},
                           buttons=["copyHtml5", "csvHtml5", "excelHtml5"]))
     ### akhir KB
+
+    ###progress
+    @render.text
+    @reactive.event(input.button)
+    async def compute():
+        with ui.Progress(min=1, max=15) as p:
+            p.set(message="Calculation in progress", detail="This may take a while...")
+
+            for i in range(1, 5):
+                p.set(i, message="Computing")
+                await asyncio.sleep(1)
+                # Normally use time.sleep() instead, but it doesn't yet work in Pyodide.
+                # https://github.com/pyodide/pyodide/issues/2354
+
+        return "Done computing!"
+
 www_dir = Path(__file__).parent / "www"
 app = App(app_ui, server, static_assets=www_dir)

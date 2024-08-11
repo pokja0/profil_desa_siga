@@ -1,0 +1,12 @@
+{
+    "https://api.shinyapps.io": {
+        "server_url": "https://api.shinyapps.io",
+        "filename": "/home/hi/Documents/projects/profil_desa_siga",
+        "app_url": "https://arole0-pokja-materi0kaper.shinyapps.io/profil-desa/",
+        "app_id": 12359981,
+        "app_guid": null,
+        "title": "profil-desa",
+        "app_mode": "python-shiny",
+        "app_store_version": 1
+    }
+}
